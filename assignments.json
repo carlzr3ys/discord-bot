@@ -1,0 +1,22 @@
+{
+    "CCS": {
+        "deskripsi": "haa",
+        "siap": [
+            "azz3y"
+        ],
+        "belum_siap": [],
+        "markah": 5,
+        "jumlah_markah": 5,
+        "due_date": "2025-04-26 23:02"
+    },
+    "Math": {
+        "deskripsi": "okee",
+        "siap": [
+            "azz3y"
+        ],
+        "belum_siap": [],
+        "markah": 5,
+        "jumlah_markah": 5,
+        "due_date": "2026-05-02 23:10"
+    }
+}
