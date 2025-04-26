@@ -6,6 +6,21 @@ from datetime import datetime
 import json
 import os
 from dotenv import load_dotenv
+from flask import Flask
+import threading
+
+app = Flask(__name__)
+
+@app.route('/')
+def hello():
+    return "Bot is running!"
+
+def run_flask():
+    app.run(host="0.0.0.0", port=5000)
+
+if __name__ == "__main__":
+    threading.Thread(target=run_flask).start()  # Start Flask server in a separate thread
+    import bot  # This will run your actual Discord bot code
 
 # Load environment variables from .env file
 load_dotenv()
