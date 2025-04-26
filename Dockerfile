@@ -15,4 +15,6 @@ COPY . .
 
 RUN mkdir -p /app/data && chmod 777 /app/data
 
+EXPOSE 5000  # This tells Render to expect traffic on port 5000
+
 CMD ["python", "bot.py"]
