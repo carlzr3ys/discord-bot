@@ -6,6 +6,7 @@ from datetime import datetime
 import json
 import os
 from dotenv import load_dotenv
+from discord.ui import View, Button
 from flask import Flask
 import threading
 
@@ -110,6 +111,52 @@ def cipta_carta_markah():
     buf.seek(0)
     return buf
 
+class MenuView(View):
+    def __init__(self):
+        super().__init__(timeout=None)
+
+    @discord.ui.button(label="Progress Saya", style=discord.ButtonStyle.primary, custom_id="progress_button")
+    async def progress_button(self, interaction: discord.Interaction, button: discord.ui.Button):
+        user = interaction.user.name
+        total_markah = 0
+        siap_assignments = []
+
+        for tajuk, info in assignments.items():
+            if user in info['siap']:
+                total_markah += info['markah']
+                siap_assignments.append(tajuk)
+
+        if not siap_assignments:
+            await interaction.response.send_message(f"❌ {user}, anda belum siapkan sebarang assignment.", ephemeral=True)
+            return
+
+        embed = discord.Embed(title=f"📈 Progress {user}", color=0x2ecc71)
+        embed.add_field(name="Jumlah Markah", value=f"{total_markah} markah", inline=False)
+        embed.add_field(name="Assignment Siap", value="\n".join(siap_assignments), inline=False)
+        await interaction.response.send_message(embed=embed, ephemeral=True)
+
+    @discord.ui.button(label="Leaderboard", style=discord.ButtonStyle.success, custom_id="leaderboard_button")
+    async def leaderboard_button(self, interaction: discord.Interaction, button: discord.ui.Button):
+        leaderboard_data = {}
+
+        for tajuk, info in assignments.items():
+            for user in info['siap']:
+                if user not in leaderboard_data:
+                    leaderboard_data[user] = 0
+                leaderboard_data[user] += info['markah']
+
+        if not leaderboard_data:
+            await interaction.response.send_message("❌ Tiada data leaderboard.", ephemeral=True)
+            return
+
+        sorted_leaderboard = sorted(leaderboard_data.items(), key=lambda x: x[1], reverse=True)
+
+        embed = discord.Embed(title="🏆 Leaderboard Assignment", color=0xf1c40f)
+        for idx, (user, markah) in enumerate(sorted_leaderboard, start=1):
+            embed.add_field(name=f"{idx}. {user}", value=f"{markah} markah", inline=False)
+
+        await interaction.response.send_message(embed=embed, ephemeral=True)
+
 @bot.event
 async def on_ready():
     load_assignments()
@@ -135,22 +182,33 @@ async def on_reaction_add(reaction, user):
 
 @bot.command(name="menu")
 async def menu(ctx):
-    embed = discord.Embed(title="📖 Menu - Panduan Command", color=0x3498db)
-    embed.add_field(name="📚 !tambahassignment", value="Tambah assignment baru. Format: !tambahassignment \"Tajuk\" \"YYYY-MM-DD HH:MM\" \"Deskripsi\" (Admin sahaja)", inline=False)
-    embed.add_field(name="📋 !tengokassignment", value="Lihat senarai assignment.", inline=False)
-    embed.add_field(name="📈 !tunjukprogress", value="Tunjuk carta progress markah.", inline=False)
-    embed.add_field(name="📊 !progress", value="Tunjuk leaderboard untuk siapa yang siap assignment paling awal dan markah mereka.", inline=False)
-    embed.add_field(name="✏️ !editassignment", value="Edit assignment. Format: !editassignment \"Tajuk Lama\" \"Tajuk Baru\" \"YYYY-MM-DD HH:MM\" \"Deskripsi Baru\" (Admin sahaja)", inline=False)
-    embed.add_field(name="🗑️ !padamassignment", value="Padam assignment. Format: !padamassignment \"Tajuk\" (Admin sahaja)", inline=False)
-    embed.add_field(name="✅ !siapassignment", value="Tandakan assignment siap. Format: !siapassignment \"Tajuk\"", inline=False)
-    embed.add_field(name="📊 Permarkahan", value="Sistem markah berdasarkan bila assignment siap:\n\n"
-                                                     "• Siap lebih 5 hari sebelum due date = 10 markah\n"
-                                                     "• Siap antara 2 hingga 4 hari sebelum due date = 5 markah\n"
-                                                     "• Siap 1 hari hingga 1 saat sebelum due date = 1 markah\n"
-                                                     "• Lebih lewat dari due date = -10 markah", inline=False)
-    await ctx.send(embed=embed)
+    view = MenuView()
 
-@bot.command(name="tambahassignment")
+    embed = discord.Embed(title="📖 Menu - Panduan Command", color=0x3498db)
+    embed.add_field(name="📚 !tambah", value="Tambah assignment baru. Format: !tambah \"Tajuk\" \"YYYY-MM-DD HH:MM\" \"Deskripsi\" (Admin sahaja)", inline=False)
+    embed.add_field(name="📋 !tengok", value="Lihat senarai assignment.", inline=False)
+    embed.add_field(name="📈 !tunjukprogress", value="Tunjuk carta progress markah.", inline=False)
+    embed.add_field(name="✏️ !edit", value="Edit assignment. Format: !edit \"Tajuk Lama\" \"Tajuk Baru\" \"YYYY-MM-DD HH:MM\" \"Deskripsi Baru\" (Admin sahaja)", inline=False)
+    embed.add_field(name="🗑️ !padam", value="Padam assignment. Format: !padam \"Tajuk\" (Admin sahaja)", inline=False)
+    embed.add_field(name="✅ !siap", value="Tandakan assignment siap. Format: !siap \"Tajuk\"", inline=False)
+    embed.add_field(name="📊 Butang Progress Saya", value="Tunjuk markah keseluruhan kamu dan assignment yang sudah siap.", inline=False)
+    embed.add_field(name="🏆 Butang Leaderboard", value="Tunjuk leaderboard untuk melihat kedudukan siapa markah paling tinggi di kalangan BITA.", inline=False)
+    embed.add_field(
+        name="📊 Permarkahan",
+        value=(
+            "Sistem markah berdasarkan bila assignment siap:\n\n"
+            "• Siap lebih 5 hari sebelum due date = 10 markah\n"
+            "• Siap antara 2 hingga 4 hari sebelum due date = 5 markah\n"
+            "• Siap 1 hari hingga 1 saat sebelum due date = 1 markah\n"
+            "• Lebih lewat dari due date = -10 markah"
+        ),
+        inline=False
+    )
+
+    await ctx.send(embed=embed, view=view)
+
+
+@bot.command(name="tambah")
 async def tambahassignment(ctx, tajuk: str, due_date: str, deskripsi: str):
     if "Admin" not in [role.name for role in ctx.author.roles]:
         await ctx.send("❌ Hanya admin boleh tambah assignment.")
@@ -160,7 +218,7 @@ async def tambahassignment(ctx, tajuk: str, due_date: str, deskripsi: str):
     except ValueError:
         await ctx.send("❌ Format tarikh salah! Guna: YYYY-MM-DD HH:MM")
         return
-    markah = 5
+    markah = 0
     assignments[tajuk] = {
         "deskripsi": deskripsi,
         "siap": [],
@@ -176,13 +234,13 @@ async def tambahassignment(ctx, tajuk: str, due_date: str, deskripsi: str):
     msg = await ctx.send(embed=embed)
     await msg.add_reaction("✅")
 
-@bot.command(name="editassignment")
+@bot.command(name="edit")
 async def editassignment(ctx, tajuk_lama: str, tajuk_baru: str, due_date: str, deskripsi: str):
     if "Admin" not in [role.name for role in ctx.author.roles]:
         await ctx.send("❌ Hanya admin boleh edit assignment.")
         return
     if tajuk_lama not in assignments:
-        await ctx.send(f"❌ Assignment `{tajuk_lama}` tak jumpa.")
+        await ctx.send(f"❌ Assignment {tajuk_lama} tak jumpa.")
         return
     try:
         due_date_obj = datetime.strptime(due_date, '%Y-%m-%d %H:%M')
@@ -193,34 +251,59 @@ async def editassignment(ctx, tajuk_lama: str, tajuk_baru: str, due_date: str, d
     assignments[tajuk_baru]['deskripsi'] = deskripsi
     assignments[tajuk_baru]['due_date'] = due_date_obj
     save_assignments()
-    await ctx.send(f"✅ Assignment `{tajuk_lama}` berjaya diedit ke `{tajuk_baru}`.")
+    await ctx.send(f"✅ Assignment {tajuk_lama} berjaya diedit ke {tajuk_baru}.")
 
-@bot.command(name="padamassignment")
+
+@bot.command(name="padam")
 async def padamassignment(ctx, tajuk: str):
     if "Admin" not in [role.name for role in ctx.author.roles]:
         await ctx.send("❌ Hanya admin boleh padam assignment.")
         return
     if tajuk not in assignments:
-        await ctx.send(f"❌ Assignment `{tajuk}` tak jumpa.")
+        await ctx.send(f"❌ Assignment {tajuk} tak jumpa.")
         return
     del assignments[tajuk]
     save_assignments()
-    await ctx.send(f"✅ Assignment `{tajuk}` berjaya dipadam!")
+    await ctx.send(f"✅ Assignment {tajuk} berjaya dipadam!")
 
-@bot.command(name="siapassignment")
+
+from datetime import datetime
+
+@bot.command(name="siap")
 async def siapassignment(ctx, tajuk: str):
     if tajuk not in assignments:
-        await ctx.send(f"❌ Assignment `{tajuk}` tak jumpa.")
+        await ctx.send(f"❌ Assignment {tajuk} tak jumpa.")
         return
+    
+    # Mengambil due_date assignment
+    due_date = assignments[tajuk]['due_date']
+    
     if ctx.author.name in assignments[tajuk]['siap']:
-        await ctx.send(f"✅ Anda dah siap assignment `{tajuk}`.")
+        await ctx.send(f"✅ Anda dah siap assignment {tajuk}.")
         return
+    
+    # Menambah nama pengguna pada senarai siap
     assignments[tajuk]['siap'].append(ctx.author.name)
-    assignments[tajuk]['jumlah_markah'] += assignments[tajuk]['markah']
+    
+    # Kirakan berapa hari awal atau lewat dari due date
+    now = datetime.now()
+    days_before_due = (due_date - now).days
+    
+    # Jika submit awal, akan dapat markah penuh, jika lewat markah akan dikurangkan
+    if days_before_due >= 0:
+        status = f"Siap {days_before_due} hari awal"
+        assignments[tajuk]['jumlah_markah'] += assignments[tajuk]['markah']
+    else:
+        status = f"Siap {abs(days_before_due)} hari lewat"
+        assignments[tajuk]['jumlah_markah'] += assignments[tajuk]['markah'] - (abs(days_before_due) * 2)  # Contoh penalti 2 markah setiap hari lewat
+    
+    # Simpan kemaskini assignments
     save_assignments()
-    await ctx.send(f"✅ {ctx.author.name} telah siap assignment `{tajuk}`!")
+    
+    await ctx.send(f"✅ {ctx.author.name} telah siap assignment {tajuk}! {status}.")
 
-@bot.command(name="tengokassignment")
+
+@bot.command(name="tengok")
 async def tengokassignment(ctx):
     if not assignments:
         await ctx.send("📭 Tiada assignment lagi.")
@@ -236,21 +319,6 @@ async def tunjukprogress(ctx):
     buf = cipta_carta_markah()
     await ctx.send(file=discord.File(buf, "progress.png"))
 
-@bot.command(name="progress")
-async def progress(ctx):
-    leaderboard = load_leaderboard()
-    if not leaderboard:
-        await ctx.send("❌ Tiada user lagi dalam leaderboard.")
-        return
-    leaderboard.sort(key=lambda x: x["total_markah"], reverse=True)
-    embed = discord.Embed(title="🏆 Leaderboard Assignment", color=0x3498db)
-    for entry in leaderboard:
-        days_text = f"{entry['days_before_due']} hari awal" if entry['days_before_due'] >= 0 else f"{abs(entry['days_before_due'])} hari lewat"
-        embed.add_field(
-            name=f"{entry['user']} - {entry['tajuk']}",
-            value=f"Markah: {entry['markah']} (Siap {days_text})\nJumlah Markah: {entry['total_markah']}",
-            inline=False
-        )
-    await ctx.send(embed=embed)
 
-bot.run(TOKEN)
+
+bot.run("TOKEN")
